@@ -21,7 +21,9 @@ _TWO_DP = Decimal("0.01")
 _ZERO = Decimal("0.00")
 
 
+# TODO(refactor): Replace this facade with focused DB modules and a connection pool.
 class Database:
+    # TODO(refactor): Move connection creation to db/connection.py.
     def __init__(self, settings: Settings) -> None:
         self._conn = psycopg.connect(
             conninfo=settings.database_url,
@@ -30,12 +32,14 @@ class Database:
         )
         self._processed_updates_missing_logged = False
 
+    # TODO(refactor): Move connection cleanup to db/connection.py.
     def close(self) -> None:
         try:
             self._conn.close()
         except Exception:
             logger.exception("Failed to close PostgreSQL connection")
 
+    # TODO(refactor): Move to db/connection.py as a database health check.
     def assert_ready(self) -> None:
         """Fail fast when PostgreSQL credentials/schema are not usable."""
         try:
@@ -46,6 +50,7 @@ class Database:
             raise RuntimeError(f"PostgreSQL connectivity check failed: {exc}") from exc
 
     # ---------- Profiles ----------
+    # TODO(refactor): Move to db/profiles.py.
     def get_or_create_profile(
         self,
         telegram_user_id: int,
@@ -79,6 +84,7 @@ class Database:
             raise RuntimeError("Failed to create or fetch profile")
         return row
 
+    # TODO(refactor): Move to db/profiles.py.
     def get_profile_by_id(self, profile_id: str) -> dict[str, Any] | None:
         with self._conn.cursor() as cur:
             cur.execute(
@@ -98,6 +104,7 @@ class Database:
             return _fetchone_row(cur)
 
     # ---------- Requests ----------
+    # TODO(refactor): Move to db/payment_requests.py.
     def create_payment_request(
         self,
         requester_id: str,
@@ -146,6 +153,7 @@ class Database:
 
         raise RuntimeError("Unable to create a unique payment request code")
 
+    # TODO(refactor): Move to db/payment_requests.py.
     def get_payment_request_by_code(self, code: str) -> dict[str, Any] | None:
         normalized_code = code.strip().upper()
         if not normalized_code:
@@ -163,6 +171,7 @@ class Database:
             )
             return _fetchone_row(cur)
 
+    # TODO(refactor): Move orchestration to services/debts.py and keep one DB transaction.
     def approve_payment_request(
         self,
         code: str,
@@ -300,6 +309,7 @@ class Database:
                 return final_row, tx, True
 
     # ---------- Balance Views ----------
+    # TODO(refactor): Move to db/balances.py.
     def list_open_balances(self, viewer_id: str) -> list[dict[str, Any]]:
         viewer_id = _normalize_uuid(viewer_id)
 
@@ -392,6 +402,7 @@ class Database:
 
         return results
 
+    # TODO(refactor): Move orchestration to services/debts.py and SQL to db/balances.py.
     def close_friend_balances(self, viewer_id: str, friend_id: str) -> list[str]:
         viewer_id = _normalize_uuid(viewer_id)
         friend_id = _normalize_uuid(friend_id)
@@ -434,6 +445,7 @@ class Database:
         return closed
 
     # ---------- Telegram update idempotency ----------
+    # TODO(refactor): Remove together with UpdateIdempotencyMiddleware.
     def mark_update_processed(self, update_id: int) -> bool:
         normalized_update_id = int(update_id)
         try:
@@ -451,6 +463,7 @@ class Database:
                 return False
             raise
 
+    # TODO(refactor): Remove together with UpdateIdempotencyMiddleware.
     def is_update_processed(self, update_id: int) -> bool:
         normalized_update_id = int(update_id)
         try:
@@ -471,6 +484,7 @@ class Database:
                 return False
             raise
 
+    # TODO(refactor): Remove together with UpdateIdempotencyMiddleware.
     def _warn_missing_processed_updates_once(self) -> None:
         if self._processed_updates_missing_logged:
             return
@@ -481,6 +495,7 @@ class Database:
         )
 
     # ---------- Internal ----------
+    # TODO(refactor): Move to db/payment_requests.py.
     def _get_payment_request_by_code_tx(
         self,
         cur: psycopg.Cursor[dict[str, Any]],
@@ -500,6 +515,7 @@ class Database:
         )
         return _fetchone_row(cur)
 
+    # TODO(refactor): Move to db/transactions.py.
     def _get_transaction_by_id_tx(
         self,
         cur: psycopg.Cursor[dict[str, Any]],
@@ -518,6 +534,7 @@ class Database:
         )
         return _fetchone_row(cur)
 
+    # TODO(refactor): Move to db/transactions.py or db/friendships.py.
     def _ensure_accepted_friendship_tx(
         self,
         cur: psycopg.Cursor[dict[str, Any]],
@@ -553,6 +570,7 @@ class Database:
             raise RuntimeError("Failed to create or fetch friendship")
         return row
 
+    # TODO(refactor): Move to db/transactions.py.
     def _create_confirmed_transaction_tx(
         self,
         cur: psycopg.Cursor[dict[str, Any]],
@@ -641,6 +659,7 @@ class Database:
 
         return row
 
+    # TODO(refactor): Move to db/balances.py.
     def _get_balance_row_tx(
         self,
         cur: psycopg.Cursor[dict[str, Any]],
@@ -659,6 +678,7 @@ class Database:
         )
         return _fetchone_row(cur)
 
+    # TODO(refactor): Move to db/balances.py.
     def _apply_balance_delta_tx(
         self,
         cur: psycopg.Cursor[dict[str, Any]],
@@ -692,6 +712,7 @@ class Database:
         return _fetchone_row(cur)
 
 
+# TODO(refactor): Move to services/debts.py as a pure business rule.
 def _transaction_effect_on_net(tx: Mapping[str, Any], friendship: Mapping[str, Any]) -> Decimal:
     """
     balances.net_amount > 0 means user_high owes user_low.
@@ -714,6 +735,7 @@ def _transaction_effect_on_net(tx: Mapping[str, Any], friendship: Mapping[str, A
     return -amount if direction == "out" else amount
 
 
+# TODO(refactor): Move to db/common.py.
 def _fetchone_row(cur: psycopg.Cursor[dict[str, Any]]) -> dict[str, Any] | None:
     row = cur.fetchone()
     if row is None:
@@ -721,14 +743,17 @@ def _fetchone_row(cur: psycopg.Cursor[dict[str, Any]]) -> dict[str, Any] | None:
     return dict(row)
 
 
+# TODO(refactor): Move to db/common.py.
 def _fetchall_rows(cur: psycopg.Cursor[dict[str, Any]]) -> list[dict[str, Any]]:
     return [dict(row) for row in cur.fetchall()]
 
 
+# TODO(refactor): Move to db/common.py.
 def _normalize_uuid(value: str | UUID) -> str:
     return str(UUID(str(value)))
 
 
+# TODO(refactor): Move to services/debts.py as a pure business rule.
 def _canonical_pair(user_a: str | UUID, user_b: str | UUID) -> tuple[str, str]:
     left = _normalize_uuid(user_a)
     right = _normalize_uuid(user_b)
@@ -737,6 +762,7 @@ def _canonical_pair(user_a: str | UUID, user_b: str | UUID) -> tuple[str, str]:
     return right, left
 
 
+# TODO(refactor): Move to db/profiles.py.
 def _normalize_username(username: str | None) -> str | None:
     if username is None:
         return None
@@ -744,6 +770,7 @@ def _normalize_username(username: str | None) -> str | None:
     return normalized if normalized else None
 
 
+# TODO(refactor): Move to db/common.py.
 def _normalize_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -751,6 +778,7 @@ def _normalize_text(value: str | None) -> str | None:
     return normalized if normalized else None
 
 
+# TODO(refactor): Reuse utils/money.py instead of keeping DB-specific money parsing.
 def _normalize_amount(value: Decimal | str | int | float) -> Decimal:
     try:
         amount = Decimal(str(value)).quantize(_TWO_DP, rounding=ROUND_HALF_UP)
@@ -762,6 +790,7 @@ def _normalize_amount(value: Decimal | str | int | float) -> Decimal:
     return amount
 
 
+# TODO(refactor): Reuse utils/money.py.
 def _to_decimal(value: Any) -> Decimal:
     try:
         return Decimal(str(value)).quantize(_TWO_DP, rounding=ROUND_HALF_UP)
@@ -769,18 +798,22 @@ def _to_decimal(value: Any) -> Decimal:
         return _ZERO
 
 
+# TODO(refactor): Move to db/common.py if the driver still requires this conversion.
 def _decimal_to_str(value: Decimal) -> str:
     return str(value.quantize(_TWO_DP, rounding=ROUND_HALF_UP))
 
 
+# TODO(refactor): Move to utils/codes.py.
 def _generate_code() -> str:
     return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LENGTH))
 
 
+# TODO(refactor): Move to db/common.py.
 def _is_unique_violation(exc: Exception) -> bool:
     return str(getattr(exc, "sqlstate", "")).upper() == "23505"
 
 
+# TODO(refactor): Remove with idempotency support; otherwise move to db/common.py.
 def _is_missing_table_error(exc: Exception, *, table_name: str) -> bool:
     if str(getattr(exc, "sqlstate", "")).upper() == "42P01":
         return True

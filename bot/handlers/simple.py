@@ -39,10 +39,12 @@ CALLBACK_CLOSE_PREFIX = "closefriend"
 _TWO_DP = Decimal("0.01")
 
 
+# TODO(refactor): Move to handlers/payments.py with the payment flow handlers.
 class InFlow(StatesGroup):
     waiting_amount = State()
 
 
+# TODO(refactor): Move to keyboards/common.py.
 def main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -56,6 +58,7 @@ def main_keyboard() -> ReplyKeyboardMarkup:
 
 
 @router.message(CommandStart())
+# TODO(refactor): Move to handlers/common.py.
 async def handle_start(
     message: Message,
     command: CommandObject,
@@ -97,6 +100,7 @@ async def handle_start(
 
 
 @router.message(F.text == BUTTON_IN)
+# TODO(refactor): Move to handlers/payments.py.
 async def handle_in_button(message: Message, state: FSMContext, settings: Settings) -> None:
     await state.set_state(InFlow.waiting_amount)
     default_currency = normalize_currency_code(settings.DEFAULT_CURRENCY)
@@ -111,6 +115,7 @@ async def handle_in_button(message: Message, state: FSMContext, settings: Settin
     StateFilter(InFlow.waiting_amount),
     ~F.text.in_({BUTTON_IN, BUTTON_BALANCE, BUTTON_CLOSE}),
 )
+# TODO(refactor): Move to handlers/payments.py.
 async def handle_in_amount(
     message: Message,
     settings: Settings,
@@ -185,6 +190,7 @@ async def handle_in_amount(
 
 
 @router.message(F.text == BUTTON_BALANCE)
+# TODO(refactor): Move to handlers/balances.py.
 async def handle_balance_button(message: Message, db: Database, state: FSMContext) -> None:
     if message.from_user is None:
         await message.answer("Unable to resolve user context.")
@@ -231,6 +237,7 @@ async def handle_balance_button(message: Message, db: Database, state: FSMContex
 
 
 @router.message(F.text == BUTTON_CLOSE)
+# TODO(refactor): Move to handlers/settlements.py.
 async def handle_close_button(message: Message, db: Database, state: FSMContext) -> None:
     if message.from_user is None:
         await message.answer("Unable to resolve user context.")
@@ -285,6 +292,7 @@ async def handle_close_button(message: Message, db: Database, state: FSMContext)
 
 
 @router.callback_query(F.data.startswith(f"{CALLBACK_PAY_APPROVE_PREFIX}:"))
+# TODO(refactor): Move to handlers/payments.py; delegate approval to DebtService.
 async def handle_pay_approve_callback(callback: CallbackQuery, db: Database) -> None:
     if callback.from_user is None:
         await callback.answer("Unable to resolve user.", show_alert=True)
@@ -358,6 +366,7 @@ async def handle_pay_approve_callback(callback: CallbackQuery, db: Database) -> 
 
 
 @router.callback_query(F.data.startswith(f"{CALLBACK_CLOSE_PREFIX}:"))
+# TODO(refactor): Move to handlers/settlements.py; delegate settlement to DebtService.
 async def handle_close_callback(callback: CallbackQuery, db: Database) -> None:
     if callback.from_user is None:
         await callback.answer("Unable to resolve user.", show_alert=True)
@@ -417,6 +426,7 @@ async def handle_close_callback(callback: CallbackQuery, db: Database) -> None:
 
 
 @router.message(F.text)
+# TODO(refactor): Move to handlers/common.py.
 async def handle_unknown_text(message: Message) -> None:
     await message.answer(
         "Use the 3 buttons below:\n"
@@ -426,6 +436,7 @@ async def handle_unknown_text(message: Message) -> None:
     )
 
 
+# TODO(refactor): Move to handlers/payments.py.
 async def _show_payment_request_for_approval(
     *,
     message: Message,
@@ -482,6 +493,7 @@ async def _show_payment_request_for_approval(
     )
 
 
+# TODO(refactor): Move to handlers/payments.py or a Telegram notification module.
 async def _notify_requester_about_approval(
     *,
     callback: CallbackQuery,
@@ -516,6 +528,7 @@ async def _notify_requester_about_approval(
         logger.info("Failed to notify requester telegram_user_id=%s", requester_tg_id, exc_info=True)
 
 
+# TODO(refactor): Move to utils/links.py and pass the bot username explicitly.
 async def _build_request_link(message: Message, settings: Settings, request_code: str) -> str | None:
     bot_username = settings.BOT_USERNAME
     if not bot_username:
@@ -532,12 +545,14 @@ async def _build_request_link(message: Message, settings: Settings, request_code
     return f"https://t.me/{clean_username}?start={PAYLOAD_PREFIX}{request_code}"
 
 
+# TODO(refactor): Move to utils/links.py.
 def _build_share_url(*, deep_link: str, amount: Decimal, currency: str) -> str:
     text = f"You owe me {_short_money(amount, currency)}"
     query = urlencode({"url": deep_link, "text": text}, quote_via=quote)
     return f"https://t.me/share/url?{query}"
 
 
+# TODO(refactor): Move to utils/callbacks.py.
 def _parse_callback_suffix(data: str | None, prefix: str) -> str | None:
     if not data:
         return None
@@ -554,6 +569,7 @@ def _parse_callback_suffix(data: str | None, prefix: str) -> str | None:
     return cleaned if cleaned else None
 
 
+# TODO(refactor): Move to utils/money.py.
 def _parse_amount_and_currency(raw_text: str, default_currency: str) -> tuple[Decimal, str]:
     tokens = raw_text.strip().split()
     if not tokens:
@@ -573,6 +589,7 @@ def _parse_amount_and_currency(raw_text: str, default_currency: str) -> tuple[De
     return amount, currency
 
 
+# TODO(refactor): Move to utils/money.py.
 def _parse_amount(raw_value: str) -> Decimal:
     cleaned = raw_value.strip().replace(" ", "")
     if not cleaned:
@@ -601,6 +618,7 @@ def _parse_amount(raw_value: str) -> Decimal:
     return amount
 
 
+# TODO(refactor): Move to utils/formatting.py.
 def _balance_summary_for_button(open_rows: list[dict[str, Any]]) -> str:
     chunks: list[str] = []
     for row in open_rows:
@@ -615,10 +633,12 @@ def _balance_summary_for_button(open_rows: list[dict[str, Any]]) -> str:
     return ", ".join(chunks) if chunks else "settled"
 
 
+# TODO(refactor): Move to utils/formatting.py.
 def _short_money(amount: Decimal, currency: str) -> str:
     return f"{_format_amount_compact(amount)} {currency}"
 
 
+# TODO(refactor): Move to utils/formatting.py.
 def _truncate_button_label(value: str, max_len: int = 60) -> str:
     cleaned = value.strip()
     if len(cleaned) <= max_len:
@@ -626,10 +646,12 @@ def _truncate_button_label(value: str, max_len: int = 60) -> str:
     return cleaned[: max_len - 3].rstrip() + "..."
 
 
+# TODO(refactor): Move to utils/formatting.py.
 def _format_money(amount: Decimal, currency: str) -> str:
     return f"{_format_amount_compact(amount)} {escape(currency)}"
 
 
+# TODO(refactor): Move to utils/money.py.
 def _format_amount_compact(amount: Decimal) -> str:
     normalized = amount.quantize(_TWO_DP, rounding=ROUND_HALF_UP)
     text = format(normalized, "f")
@@ -638,6 +660,7 @@ def _format_amount_compact(amount: Decimal) -> str:
     return text
 
 
+# TODO(refactor): Move to utils/money.py.
 def _to_decimal(value: Any) -> Decimal:
     try:
         return Decimal(str(value)).quantize(_TWO_DP, rounding=ROUND_HALF_UP)
@@ -645,6 +668,7 @@ def _to_decimal(value: Any) -> Decimal:
         return Decimal("0.00")
 
 
+# TODO(refactor): Move to utils/telegram_users.py.
 def _display_name_from_message(message: Message) -> str | None:
     if message.from_user is None:
         return None
@@ -654,6 +678,7 @@ def _display_name_from_message(message: Message) -> str | None:
     return full or None
 
 
+# TODO(refactor): Move to utils/telegram_users.py.
 def _display_name_from_callback(callback: CallbackQuery) -> str | None:
     first_name = (callback.from_user.first_name or "").strip()
     last_name = (callback.from_user.last_name or "").strip()
@@ -661,6 +686,7 @@ def _display_name_from_callback(callback: CallbackQuery) -> str | None:
     return full or None
 
 
+# TODO(refactor): Move to utils/formatting.py.
 def _profile_label(profile: dict[str, Any] | None) -> str:
     if not profile:
         return "friend"
