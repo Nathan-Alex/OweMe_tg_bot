@@ -1,0 +1,2 @@
+"""Standalone WhatsApp bot implementation."""
+
