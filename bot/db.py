@@ -28,6 +28,7 @@ class Database:
         self._conn = psycopg.connect(
             conninfo=settings.database_url,
             autocommit=True,
+            prepare_threshold=None,
             row_factory=dict_row,
         )
         self._processed_updates_missing_logged = False

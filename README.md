@@ -104,3 +104,16 @@ If your Vercel storage integration injects `POSTGRES_URL` instead of `DATABASE_U
 ## Database note
 
 This version requires table `payment_requests` and `processed_updates` from `postgres/schema.sql`.
+
+## Supabase database note
+
+Supabase direct database URLs resolve to IPv6 by default. If the deployment platform is IPv4-only, use the Supabase pooler connection string from Dashboard -> Connect instead of adding a separate IP override.
+
+For long-lived servers, use the Session pooler URL on port `5432`. For serverless or auto-scaling deployments, use the Transaction pooler URL on port `6543`:
+
+```env
+DATABASE_URL=postgres://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+WHATSAPP_DATABASE_URL=postgres://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+```
+
+The psycopg connections disable prepared statements so they work with Supabase Transaction pooler.
