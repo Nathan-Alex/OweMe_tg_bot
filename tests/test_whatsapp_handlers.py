@@ -210,13 +210,19 @@ class WhatsAppHandlersTest(unittest.TestCase):
     def test_balance_sends_open_balances(self) -> None:
         self.run_handler(make_event(message_id="wamid.balance", text="Balance"))
 
-        self.assertEqual(self.client.texts[0]["text"], "Your balance:\nBob + 15 USD")
+        self.assertEqual(self.client.texts[0]["text"], "Open balances:\nYou owe Bob 15 USD")
+        self.assertEqual(self.client.buttons[0]["body"], "What next?")
 
     def test_close_sends_interactive_list(self) -> None:
         self.run_handler(make_event(message_id="wamid.close", text="Close"))
 
         self.assertEqual(len(self.client.lists), 1)
+        self.assertEqual(
+            self.client.lists[0]["body"],
+            "Choose a balance to close.\nThis will mark it as settled.",
+        )
         self.assertEqual(self.client.lists[0]["rows"][0].title, "Bob")
+        self.assertEqual(self.client.lists[0]["rows"][0].description, "You owe 15 USD")
         self.assertEqual(
             self.client.lists[0]["rows"][0].id,
             f"{ACTION_CLOSE_PREFIX}{self.db.friend_profile['id']}",
@@ -232,7 +238,8 @@ class WhatsAppHandlersTest(unittest.TestCase):
         )
 
         self.assertEqual(self.db.closed_args["friend_id"], self.db.friend_profile["id"])  # type: ignore[index]
-        self.assertIn("Closed balance with Bob for USD.", self.client.texts[0]["text"])
+        self.assertIn("Closed balance with Bob.\nSettled: USD.", self.client.texts[0]["text"])
+        self.assertEqual(self.client.buttons[0]["body"], "What next?")
 
     def test_approve_code_confirms_request(self) -> None:
         self.run_handler(make_event(message_id="wamid.approve", text="approve abc123"))

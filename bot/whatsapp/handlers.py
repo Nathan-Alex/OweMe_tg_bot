@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import logging
 import re
-from decimal import Decimal
 from urllib.parse import quote
 from uuid import UUID
 
-from ..services.formatting import balance_summary_for_button, format_money, profile_label, truncate_button_label
+from ..services.formatting import (
+    balance_line_for_friend,
+    balance_summary_for_button,
+    format_money,
+    profile_label,
+    truncate_button_label,
+)
 from ..services.money import parse_amount_and_currency, to_decimal
 from .client import ListRow, ReplyButton, WhatsAppClient
 from .config import WhatsAppSettings
@@ -72,7 +77,7 @@ async def handle_message(
         await _send_main_menu(
             client=client,
             to=event.from_user_id,
-            body="Use the buttons below.",
+            body="What do you want to do?",
         )
     except Exception:
         logger.exception("Failed to handle WhatsApp message_id=%s", event.message_id)
@@ -147,6 +152,7 @@ async def _handle_amount(
             f"Amount: {format_money(amount, currency)}"
         ),
     )
+    await _send_next_menu(client=client, to=event.from_user_id)
 
 
 async def _handle_balance(
@@ -170,24 +176,22 @@ async def _handle_balance(
             to=event.from_user_id,
             text="No open balances.\nTap In when someone lends you money.",
         )
+        await _send_next_menu(client=client, to=event.from_user_id)
         return
 
-    lines = ["Your balance:"]
+    lines = ["Open balances:"]
     for item in sorted(
         open_balances,
         key=lambda row: profile_label(row.get("friend_profile", {})).lower(),
     ):
         friend_label = profile_label(item.get("friend_profile", {}))
         for row in item.get("open_rows", []):
-            currency = str(row.get("currency", "")).upper()
-            they_owe_you = to_decimal(row.get("they_owe_you"))
-            you_owe = to_decimal(row.get("you_owe"))
-            if you_owe > Decimal("0"):
-                lines.append(f"{friend_label} + {format_money(you_owe, currency)}")
-            elif they_owe_you > Decimal("0"):
-                lines.append(f"{friend_label} - {format_money(they_owe_you, currency)}")
+            line = balance_line_for_friend(friend_label, row)
+            if line is not None:
+                lines.append(line)
 
     await client.send_text(to=event.from_user_id, text="\n".join(lines))
+    await _send_next_menu(client=client, to=event.from_user_id)
 
 
 async def _handle_close(
@@ -231,11 +235,12 @@ async def _handle_close(
 
     if not rows:
         await client.send_text(to=event.from_user_id, text="No open balances to close.")
+        await _send_next_menu(client=client, to=event.from_user_id)
         return
 
     await client.send_list(
         to=event.from_user_id,
-        body="Choose a person to close.\nThis sets your mutual balance to 0.",
+        body="Choose a balance to close.\nThis will mark it as settled.",
         button_text="Choose",
         rows=rows,
     )
@@ -276,12 +281,14 @@ async def _handle_close_reply(
     friend_label = profile_label(friend_profile)
     if not closed_currencies:
         await client.send_text(to=event.from_user_id, text=f"{friend_label} is already settled.")
+        await _send_next_menu(client=client, to=event.from_user_id)
         return
 
     await client.send_text(
         to=event.from_user_id,
-        text=f"Closed balance with {friend_label} for {', '.join(closed_currencies)}.",
+        text=f"Closed balance with {friend_label}.\nSettled: {', '.join(closed_currencies)}.",
     )
+    await _send_next_menu(client=client, to=event.from_user_id)
 
 
 async def _handle_approve(
@@ -318,6 +325,7 @@ async def _handle_approve(
         )
     else:
         await client.send_text(to=event.from_user_id, text="This request was already confirmed.")
+    await _send_next_menu(client=client, to=event.from_user_id)
 
     requester_id = str(request_row.get("requester_id", ""))
     requester_profile = db.get_profile_by_id(requester_id) if requester_id else None
@@ -349,6 +357,10 @@ async def _send_main_menu(*, client: WhatsAppClient, to: str, body: str) -> None
             ReplyButton(id=ACTION_CLOSE, title=BUTTON_CLOSE),
         ],
     )
+
+
+async def _send_next_menu(*, client: WhatsAppClient, to: str) -> None:
+    await _send_main_menu(client=client, to=to, body="What next?")
 
 
 def _action_from_event(event: WhatsAppMessage) -> str | None:

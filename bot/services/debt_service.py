@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from .formatting import balance_summary_for_button, format_money, profile_label, truncate_button_label
+from .formatting import (
+    balance_line_for_friend,
+    balance_summary_for_button,
+    format_money,
+    profile_label,
+    truncate_button_label,
+)
 from .money import parse_amount_and_currency, to_decimal
 
 if TYPE_CHECKING:
@@ -109,7 +114,7 @@ class DebtService:
                 has_open_balances=False,
             )
 
-        lines = ["Your balance:"]
+        lines = ["Open balances:"]
         for item in sorted(
             open_balances,
             key=lambda row: profile_label(row.get("friend_profile", {})).lower(),
@@ -117,13 +122,9 @@ class DebtService:
             friend_profile = item.get("friend_profile", {})
             friend_label = profile_label(friend_profile)
             for row in item.get("open_rows", []):
-                currency = str(row.get("currency", "")).upper()
-                they_owe_you = to_decimal(row.get("they_owe_you"))
-                you_owe = to_decimal(row.get("you_owe"))
-                if you_owe > Decimal("0"):
-                    lines.append(f"{friend_label} + {format_money(you_owe, currency)}")
-                elif they_owe_you > Decimal("0"):
-                    lines.append(f"{friend_label} - {format_money(they_owe_you, currency)}")
+                line = balance_line_for_friend(friend_label, row)
+                if line is not None:
+                    lines.append(line)
 
         if len(lines) == 1:
             return BalanceTextResult(

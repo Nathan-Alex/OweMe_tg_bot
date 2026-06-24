@@ -27,7 +27,7 @@ class ServiceMoneyFormattingTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_amount_and_currency("100 USD lunch", "ILS")
 
-    def test_balance_summary_uses_plus_when_you_owe(self) -> None:
+    def test_balance_summary_says_when_you_owe(self) -> None:
         summary = balance_summary_for_button(
             [
                 {
@@ -37,9 +37,9 @@ class ServiceMoneyFormattingTest(unittest.TestCase):
                 }
             ]
         )
-        self.assertEqual(summary, "+15 USD")
+        self.assertEqual(summary, "You owe 15 USD")
 
-    def test_balance_summary_uses_minus_when_friend_owes_you(self) -> None:
+    def test_balance_summary_says_when_friend_owes_you(self) -> None:
         summary = balance_summary_for_button(
             [
                 {
@@ -49,7 +49,7 @@ class ServiceMoneyFormattingTest(unittest.TestCase):
                 }
             ]
         )
-        self.assertEqual(summary, "-20.5 ILS")
+        self.assertEqual(summary, "Owes you 20.5 ILS")
 
     def test_profile_label_supports_generic_username(self) -> None:
         self.assertEqual(profile_label({"username": "alice"}), "@alice")

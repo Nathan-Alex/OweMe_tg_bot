@@ -116,14 +116,14 @@ class DebtServiceTest(unittest.TestCase):
         result = self.service.build_balance_text(identity=self.identity)
 
         self.assertTrue(result.has_open_balances)
-        self.assertEqual(result.text, "Your balance:\nBob + 15 USD")
+        self.assertEqual(result.text, "Open balances:\nYou owe Bob 15 USD")
 
     def test_build_close_options_returns_friend_labels(self) -> None:
         result = self.service.build_close_options(identity=self.identity)
 
         self.assertEqual(len(result.options), 1)
         self.assertEqual(result.options[0].friend_id, self.db.friend_profile["id"])
-        self.assertEqual(result.options[0].label, "Bob (+15 USD)")
+        self.assertEqual(result.options[0].label, "Bob (You owe 15 USD)")
 
     def test_close_friend_balance_calls_database(self) -> None:
         result = self.service.close_friend_balance(

@@ -105,6 +105,14 @@ If your Vercel storage integration injects `POSTGRES_URL` instead of `DATABASE_U
 
 This version requires table `payment_requests` and `processed_updates` from `postgres/schema.sql`.
 
+For WhatsApp support on an existing Supabase database, also run:
+
+```sql
+postgres/migrations/20260624_whatsapp_supabase.sql
+```
+
+It adds WhatsApp profile columns, `processed_events`, and `user_sessions` without recreating existing Telegram data.
+
 ## Supabase database note
 
 Supabase direct database URLs resolve to IPv6 by default. If the deployment platform is IPv4-only, use the Supabase pooler connection string from Dashboard -> Connect instead of adding a separate IP override.

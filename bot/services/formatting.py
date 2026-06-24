@@ -22,11 +22,22 @@ def balance_summary_for_button(open_rows: list[dict[str, Any]]) -> str:
         they_owe_you = to_decimal(row.get("they_owe_you"))
         you_owe = to_decimal(row.get("you_owe"))
         if you_owe > Decimal("0"):
-            chunks.append(f"+{short_money(you_owe, currency)}")
+            chunks.append(f"You owe {short_money(you_owe, currency)}")
         elif they_owe_you > Decimal("0"):
-            chunks.append(f"-{short_money(they_owe_you, currency)}")
+            chunks.append(f"Owes you {short_money(they_owe_you, currency)}")
 
     return ", ".join(chunks) if chunks else "settled"
+
+
+def balance_line_for_friend(friend_label: str, row: dict[str, Any]) -> str | None:
+    currency = str(row.get("currency", "")).upper()
+    they_owe_you = to_decimal(row.get("they_owe_you"))
+    you_owe = to_decimal(row.get("you_owe"))
+    if you_owe > Decimal("0"):
+        return f"You owe {friend_label} {short_money(you_owe, currency)}"
+    if they_owe_you > Decimal("0"):
+        return f"{friend_label} owes you {short_money(they_owe_you, currency)}"
+    return None
 
 
 def truncate_button_label(value: str, max_len: int = 60) -> str:
